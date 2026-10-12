@@ -1,0 +1,60 @@
+name: Build Intel macOS DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref/tag to build (default: v0.7.5)'
+        required: true
+        default: 'v0.7.5'
+
+jobs:
+  macos-intel:
+    name: Build Drift Intel (x86_64) DMG
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew update
+          brew install qt ffmpeg zstd openssl@3 sound-touch ninja
+
+      - name: Restore Skia cache
+        id: skia-cache
+        uses: actions/cache@v4
+        with:
+          path: third_party/prebuilt/skia/mac-x64
+          key: v2-skia-mac-x64-${{ hashFiles('third_party/build-skia.sh') }}
+
+      - name: Build Skia (Intel x86_64)
+        if: steps.skia-cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x third_party/build-skia.sh
+          JOBS="$(sysctl -n hw.ncpu)" third_party/build-skia.sh mac-x64
+          rm -rf third_party/src
+
+      - name: Configure CMake
+        run: |
+          cmake -B build-macos -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix openssl@3);$(brew --prefix)"             -DDRIFT_BUNDLE_ONNXRUNTIME=OFF             -DDRIFT_WITH_SKIA=ON             -DDRIFT_DISTRIBUTION=macos             -DDRIFT_CHANNEL=stable
+
+      - name: Build Drift
+        run: cmake --build build-macos --parallel
+
+      - name: Package macOS Disk Image (.dmg)
+        run: |
+          chmod +x scripts/package-macos.sh
+          scripts/package-macos.sh --build-dir build-macos --skip-build
+
+      - name: Upload Drift DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Drift-x86_64-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
