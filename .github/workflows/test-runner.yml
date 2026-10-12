@@ -5,8 +5,7 @@ jobs:
   test:
     runs-on: macos-15-intel
     steps:
-      - name: System info
+      - name: Check Homebrew Qt formulas
         run: |
-          uname -m
-          sw_vers
-          brew --version
+          brew info qt || true
+          brew info qtmultimedia || true
