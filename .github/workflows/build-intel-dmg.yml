@@ -23,8 +23,17 @@ jobs:
 
       - name: Install dependencies via Homebrew
         run: |
-          brew update
-          brew install qt ffmpeg zstd openssl@3 sound-touch ninja
+          brew install ffmpeg zstd openssl@3 sound-touch ninja
+
+      - name: Install precompiled Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'
+          modules: 'qtmultimedia qtimageformats'
+          add-tools-to-path: true
 
       - name: Restore Skia cache
         id: skia-cache
@@ -42,7 +51,7 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B build-macos -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix openssl@3);$(brew --prefix)"             -DDRIFT_BUNDLE_ONNXRUNTIME=OFF             -DDRIFT_WITH_SKIA=ON             -DDRIFT_DISTRIBUTION=macos             -DDRIFT_CHANNEL=stable
+          cmake -B build-macos -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR};$(brew --prefix openssl@3);$(brew --prefix)"             -DFETCHCONTENT_BASE_DIR="${{ github.workspace }}/.deps"             -DDRIFT_BUNDLE_ONNXRUNTIME=OFF             -DDRIFT_WITH_SKIA=ON             -DDRIFT_DISTRIBUTION=macos             -DDRIFT_CHANNEL=stable
 
       - name: Build Drift
         run: cmake --build build-macos --parallel
@@ -50,7 +59,7 @@ jobs:
       - name: Package macOS Disk Image (.dmg)
         run: |
           chmod +x scripts/package-macos.sh
-          scripts/package-macos.sh --build-dir build-macos --skip-build
+          scripts/package-macos.sh --build-dir build-macos --skip-build --qt-prefix "${QT_ROOT_DIR}"
 
       - name: Upload Drift DMG Artifact
         uses: actions/upload-artifact@v4
