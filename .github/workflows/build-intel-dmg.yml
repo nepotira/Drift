@@ -59,6 +59,8 @@ jobs:
       - name: Package macOS Disk Image (.dmg)
         run: |
           chmod +x scripts/package-macos.sh
+          # Official Qt macdeployqt does not accept -no-codesign (only Homebrew fork did)
+          sed -i.bak 's/ -no-codesign//g' scripts/package-macos.sh
           scripts/package-macos.sh --build-dir build-macos --skip-build --qt-prefix "${QT_ROOT_DIR}"
 
       - name: Upload Drift DMG Artifact
